@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 
 import { analyzeEnv, parseBreachDate, sortFindings } from './heuristics.mjs';
-import { listProjects, listEnvVars, normalizeScopeLabel } from './audit.mjs';
+import {
+  discoverScopesWithToken,
+  listProjects,
+  listEnvVars,
+  listProjectsViaCli,
+  listEnvVarsViaCli,
+  normalizeScopeLabel,
+} from './audit.mjs';
 import { printHuman } from './formatters.mjs';
-import { readLinkedProject, listLinkedEnvVars } from './auth.mjs';
+import { discoverCliScopes, readLinkedProject, listLinkedEnvVars } from './auth.mjs';
 
 function parseArgs(argv) {
   const out = {
@@ -34,7 +41,6 @@ function parseArgs(argv) {
     else throw new Error(`Unknown argument: ${arg}`);
   }
 
-  if (out.scopes.length === 0) out.scopes = ['personal'];
   return out;
 }
 
@@ -44,7 +50,7 @@ function usage() {
     '  vercel-sedret-audit [options]',
     '',
     'Options:',
-    '  --scope <personal|team-slug|team-id>   Repeatable, defaults to personal',
+    '  --scope <personal|team-slug|team-id>   Repeatable, defaults to all accessible scopes',
     '  --project <name>                       Only audit named project(s), repeatable',
     '  --linked-dir <path>                    Audit linked local project dir(s), repeatable',
     '  --breach-date <YYYY-MM-DD>             Compare updatedAt against a breach date',
@@ -53,10 +59,52 @@ function usage() {
     '  --json                                 Emit JSON instead of human-readable text',
     '  -h, --help                             Show this help',
     '',
-    'Auth:',
-    '  - Uses VERCEL_TOKEN for cross-project API audits',
-    '  - Uses your existing Vercel CLI login for --linked-dir audits',
+    'Defaults:',
+    '  - With no options, audits all accessible Vercel projects using your current CLI login.',
+    '  - If VERCEL_TOKEN is set, uses the API directly across all accessible scopes.',
+    '  - If --linked-dir is passed, audits those linked project directories too.',
   ].join('\n');
+}
+
+async function collectFromLinkedDirs(args, projectFilter, breachDate, results, failures) {
+  for (const dir of args.linkedDirs) {
+    try {
+      const project = await readLinkedProject(dir);
+      if (projectFilter.size > 0 && !projectFilter.has(String(project.projectName).toLowerCase())) continue;
+      const envs = await listLinkedEnvVars(dir);
+      for (const env of envs) {
+        const finding = analyzeEnv(env, { breachDate });
+        results.push({ scope: project.orgId || 'linked', project: project.projectName || project.projectId, projectId: project.projectId, ...finding });
+      }
+    } catch (error) {
+      failures.push({ scope: 'linked', project: dir, stage: 'linkedDir', error: error.message });
+    }
+  }
+}
+
+async function collectFromScopes(scopes, listProjectsFn, listEnvVarsFn, projectFilter, breachDate, decrypt, results, failures) {
+  for (const scope of scopes) {
+    let projects;
+    try {
+      projects = await listProjectsFn(scope);
+    } catch (error) {
+      failures.push({ scope, stage: 'listProjects', error: error.message });
+      continue;
+    }
+
+    for (const project of projects) {
+      if (projectFilter.size > 0 && !projectFilter.has(String(project.name).toLowerCase())) continue;
+      try {
+        const envs = await listEnvVarsFn(project, scope, decrypt);
+        for (const env of envs) {
+          const finding = analyzeEnv(env, { breachDate });
+          results.push({ scope: normalizeScopeLabel(scope), project: project.name, projectId: project.id, ...finding });
+        }
+      } catch (error) {
+        failures.push({ scope, project: project.name, stage: 'listEnvVars', error: error.message });
+      }
+    }
+  }
 }
 
 async function main() {
@@ -67,55 +115,47 @@ async function main() {
   }
 
   const token = process.env.VERCEL_TOKEN;
-  const hasLinkedDirs = args.linkedDirs.length > 0;
-  if (!token && !hasLinkedDirs) {
-    throw new Error('Missing auth. Either set VERCEL_TOKEN, or use --linked-dir with a local Vercel-linked project directory.');
-  }
-
   const breachDate = parseBreachDate(args.breachDate);
   const projectFilter = new Set(args.projects.map((p) => p.toLowerCase()));
   const results = [];
   const failures = [];
 
-  if (hasLinkedDirs) {
-    for (const dir of args.linkedDirs) {
-      try {
-        const project = await readLinkedProject(dir);
-        if (projectFilter.size > 0 && !projectFilter.has(String(project.projectName).toLowerCase())) continue;
-        const envs = await listLinkedEnvVars(dir);
-        for (const env of envs) {
-          const finding = analyzeEnv(env, { breachDate });
-          results.push({ scope: project.orgId || 'linked', project: project.projectName || project.projectId, projectId: project.projectId, ...finding });
-        }
-      } catch (error) {
-        failures.push({ scope: 'linked', project: dir, stage: 'linkedDir', error: error.message });
-      }
-    }
+  if (args.linkedDirs.length > 0) {
+    await collectFromLinkedDirs(args, projectFilter, breachDate, results, failures);
   }
 
-  if (token) {
-    for (const scope of args.scopes) {
-      let projects;
-      try {
-        projects = await listProjects(token, scope);
-      } catch (error) {
-        failures.push({ scope, stage: 'listProjects', error: error.message });
-        continue;
-      }
+  const explicitScopes = args.scopes.length > 0 ? args.scopes : null;
 
-      for (const project of projects) {
-        if (projectFilter.size > 0 && !projectFilter.has(String(project.name).toLowerCase())) continue;
-        try {
-          const envs = await listEnvVars(token, project, scope, args.decrypt);
-          for (const env of envs) {
-            const finding = analyzeEnv(env, { breachDate });
-            results.push({ scope: normalizeScopeLabel(scope), project: project.name, projectId: project.id, ...finding });
-          }
-        } catch (error) {
-          failures.push({ scope, project: project.name, stage: 'listEnvVars', error: error.message });
-        }
-      }
-    }
+  if (token) {
+    const discovered = explicitScopes
+      ? explicitScopes
+      : ['personal', ...((await discoverScopesWithToken(token)).teams.map((team) => team.slug || team.teamId))];
+
+    await collectFromScopes(
+      discovered,
+      (scope) => listProjects(token, scope),
+      (project, scope, decrypt) => listEnvVars(token, project, scope, decrypt),
+      projectFilter,
+      breachDate,
+      args.decrypt,
+      results,
+      failures,
+    );
+  } else if (args.linkedDirs.length === 0 || explicitScopes) {
+    const discovered = explicitScopes
+      ? explicitScopes
+      : ['personal', ...((await discoverCliScopes()).teams.map((team) => team.slug || team.teamId))];
+
+    await collectFromScopes(
+      discovered,
+      (scope) => listProjectsViaCli(scope),
+      (project, scope, decrypt) => listEnvVarsViaCli(project, scope, decrypt),
+      projectFilter,
+      breachDate,
+      args.decrypt,
+      results,
+      failures,
+    );
   }
 
   if (args.json) {

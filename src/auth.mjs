@@ -21,6 +21,21 @@ export async function execJson(command, args) {
   });
 }
 
+export async function vercelApiJson(path) {
+  return await execJson('vercel', ['api', path, '--raw']);
+}
+
+export async function discoverCliScopes() {
+  const user = await vercelApiJson('/v2/user');
+  const teams = await vercelApiJson('/v2/teams');
+  return {
+    personal: { label: 'personal', accountId: user?.user?.id ?? null },
+    teams: Array.isArray(teams?.teams)
+      ? teams.teams.map((team) => ({ label: team.slug || team.id, teamId: team.id, slug: team.slug || null }))
+      : [],
+  };
+}
+
 export async function readLinkedProject(dir) {
   const path = `${dir.replace(/\/$/, '')}/.vercel/project.json`;
   const raw = await readFile(path, 'utf8');

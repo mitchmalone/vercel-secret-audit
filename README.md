@@ -16,25 +16,36 @@ It helps answer two practical questions after the April 2026 incident:
 ## Quick start
 
 ```bash
-npx vercel-sedret-audit --linked-dir .
+npx vercel-sedret-audit
 ```
+
+By default, it will:
+- use your current Vercel CLI login
+- find all accessible Vercel projects across your personal account and teams
+- audit each project automatically
 
 Or with a token:
 
 ```bash
-VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope personal
+VERCEL_TOKEN=xxx npx vercel-sedret-audit
 ```
 
 ## Common usage
 
 ```bash
-# audit the current linked Vercel project
+# audit all accessible projects via current Vercel CLI login
+npx vercel-sedret-audit
+
+# audit the current linked Vercel project only
 npx vercel-sedret-audit --linked-dir .
 
 # audit multiple linked projects
 npx vercel-sedret-audit --linked-dir ./app-a --linked-dir ./app-b
 
-# audit a Vercel account or team with API token auth
+# audit all accessible projects with API token auth
+VERCEL_TOKEN=xxx npx vercel-sedret-audit
+
+# limit to one scope if needed
 VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope personal
 VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team
 
