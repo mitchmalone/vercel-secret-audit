@@ -66,11 +66,70 @@ function usage() {
   ].join('\n');
 }
 
-async function collectFromLinkedDirs(args, projectFilter, breachDate, results, failures) {
+function createProgress(enabled) {
+  if (!enabled) {
+    return {
+      start() {},
+      update() {},
+      succeed() {},
+      fail() {},
+      stop() {},
+    };
+  }
+
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let text = '';
+  let timer = null;
+  let i = 0;
+
+  const render = (prefix = frames[i % frames.length]) => {
+    process.stdout.write(`\r${prefix} ${text}`);
+  };
+
+  const clear = () => {
+    process.stdout.write('\r\x1b[K');
+  };
+
+  return {
+    start(nextText) {
+      text = nextText;
+      clearInterval(timer);
+      render();
+      timer = setInterval(() => {
+        i += 1;
+        render();
+      }, 80);
+    },
+    update(nextText) {
+      text = nextText;
+      render();
+    },
+    succeed(nextText) {
+      clearInterval(timer);
+      if (nextText) text = nextText;
+      clear();
+      process.stdout.write(`✅ ${text}\n`);
+    },
+    fail(nextText) {
+      clearInterval(timer);
+      if (nextText) text = nextText;
+      clear();
+      process.stdout.write(`❌ ${text}\n`);
+    },
+    stop() {
+      clearInterval(timer);
+      clear();
+    },
+  };
+}
+
+async function collectFromLinkedDirs(args, projectFilter, breachDate, results, failures, progress) {
   for (const dir of args.linkedDirs) {
     try {
+      progress.update(`Checking linked project ${dir}`);
       const project = await readLinkedProject(dir);
       if (projectFilter.size > 0 && !projectFilter.has(String(project.projectName).toLowerCase())) continue;
+      progress.update(`Reading env vars for linked project ${project.projectName || project.projectId}`);
       const envs = await listLinkedEnvVars(dir);
       for (const env of envs) {
         const finding = analyzeEnv(env, { breachDate });
@@ -83,10 +142,11 @@ async function collectFromLinkedDirs(args, projectFilter, breachDate, results, f
   }
 }
 
-async function collectFromScopes(scopes, listProjectsFn, listEnvVarsFn, projectFilter, breachDate, decrypt, results, failures) {
+async function collectFromScopes(scopes, listProjectsFn, listEnvVarsFn, projectFilter, breachDate, decrypt, results, failures, progress) {
   for (const scope of scopes) {
     let projects;
     try {
+      progress.update(`Loading projects for scope ${scope}`);
       projects = await listProjectsFn(scope);
     } catch (error) {
       failures.push({ scope, stage: 'listProjects', error: error.message });
@@ -96,6 +156,7 @@ async function collectFromScopes(scopes, listProjectsFn, listEnvVarsFn, projectF
     for (const project of projects) {
       if (projectFilter.size > 0 && !projectFilter.has(String(project.name).toLowerCase())) continue;
       try {
+        progress.update(`Auditing ${scope}/${project.name}`);
         const envs = await listEnvVarsFn(project, scope, decrypt);
         for (const env of envs) {
           const finding = analyzeEnv(env, { breachDate });
@@ -115,6 +176,7 @@ async function main() {
     return;
   }
 
+  const progress = createProgress(!args.json && !!process.stdout.isTTY);
   const token = process.env.VERCEL_TOKEN;
   const breachDate = parseBreachDate(args.breachDate);
   const projectFilter = new Set(args.projects.map((p) => p.toLowerCase()));
@@ -122,12 +184,17 @@ async function main() {
   const failures = [];
 
   if (args.linkedDirs.length > 0) {
-    await withCliLoginRetry(() => collectFromLinkedDirs(args, projectFilter, breachDate, results, failures));
+    progress.start('Preparing linked project audit');
+    await withCliLoginRetry(async () => {
+      progress.stop();
+      await collectFromLinkedDirs(args, projectFilter, breachDate, results, failures, progress);
+    });
   }
 
   const explicitScopes = args.scopes.length > 0 ? args.scopes : null;
 
   if (token) {
+    progress.start('Discovering accessible scopes via VERCEL_TOKEN');
     const discovered = explicitScopes
       ? explicitScopes
       : ['personal', ...((await discoverScopesWithToken(token)).teams.map((team) => team.slug || team.teamId))];
@@ -141,9 +208,13 @@ async function main() {
       args.decrypt,
       results,
       failures,
+      progress,
     );
   } else if (args.linkedDirs.length === 0 || explicitScopes) {
+    progress.start('Checking Vercel CLI authentication');
     await withCliLoginRetry(async () => {
+      progress.stop();
+      progress.start('Discovering accessible scopes via Vercel CLI');
       const discovered = explicitScopes
         ? explicitScopes
         : ['personal', ...((await discoverCliScopes()).teams.map((team) => team.slug || team.teamId))];
@@ -157,9 +228,12 @@ async function main() {
         args.decrypt,
         results,
         failures,
+        progress,
       );
     });
   }
+
+  progress.succeed(`Audit complete, checked ${new Set(results.map((r) => `${r.scope}/${r.project}`)).size} project(s)`);
 
   if (args.json) {
     process.stdout.write(JSON.stringify({ results: sortFindings(results), failures }, null, 2));
