@@ -10,7 +10,7 @@ import {
   normalizeScopeLabel,
 } from './audit.mjs';
 import { printHuman } from './formatters.mjs';
-import { discoverCliScopes, readLinkedProject, listLinkedEnvVars } from './auth.mjs';
+import { discoverCliScopes, isVercelAuthError, readLinkedProject, listLinkedEnvVars, withCliLoginRetry } from './auth.mjs';
 
 function parseArgs(argv) {
   const out = {
@@ -77,6 +77,7 @@ async function collectFromLinkedDirs(args, projectFilter, breachDate, results, f
         results.push({ scope: project.orgId || 'linked', project: project.projectName || project.projectId, projectId: project.projectId, ...finding });
       }
     } catch (error) {
+      if (isVercelAuthError(error)) throw error;
       failures.push({ scope: 'linked', project: dir, stage: 'linkedDir', error: error.message });
     }
   }
@@ -121,7 +122,7 @@ async function main() {
   const failures = [];
 
   if (args.linkedDirs.length > 0) {
-    await collectFromLinkedDirs(args, projectFilter, breachDate, results, failures);
+    await withCliLoginRetry(() => collectFromLinkedDirs(args, projectFilter, breachDate, results, failures));
   }
 
   const explicitScopes = args.scopes.length > 0 ? args.scopes : null;
@@ -142,20 +143,22 @@ async function main() {
       failures,
     );
   } else if (args.linkedDirs.length === 0 || explicitScopes) {
-    const discovered = explicitScopes
-      ? explicitScopes
-      : ['personal', ...((await discoverCliScopes()).teams.map((team) => team.slug || team.teamId))];
+    await withCliLoginRetry(async () => {
+      const discovered = explicitScopes
+        ? explicitScopes
+        : ['personal', ...((await discoverCliScopes()).teams.map((team) => team.slug || team.teamId))];
 
-    await collectFromScopes(
-      discovered,
-      (scope) => listProjectsViaCli(scope),
-      (project, scope, decrypt) => listEnvVarsViaCli(project, scope, decrypt),
-      projectFilter,
-      breachDate,
-      args.decrypt,
-      results,
-      failures,
-    );
+      await collectFromScopes(
+        discovered,
+        (scope) => listProjectsViaCli(scope),
+        (project, scope, decrypt) => listEnvVarsViaCli(project, scope, decrypt),
+        projectFilter,
+        breachDate,
+        args.decrypt,
+        results,
+        failures,
+      );
+    });
   }
 
   if (args.json) {
