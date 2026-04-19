@@ -1,5 +1,8 @@
 # vercel-secret-audit
 
+[![CI](https://github.com/mitchmalone/vercel-secret-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/mitchmalone/vercel-secret-audit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A local audit tool for Vercel environment variables.
 
 It helps with two jobs:
@@ -50,6 +53,17 @@ If you want to use token auth instead:
 
 ```bash
 VERCEL_TOKEN=xxx npm run audit
+```
+
+## Example output
+
+```text
+Vercel secret audit
+3 project(s), 2 critical, 1 medium, 4 low, 12 ok
+
+🚨 CRITICAL personal/my-app STRIPE_SECRET_KEY production, plain, last update 2026-04-18, unchanged since breach, looks unchanged since breach, advise to rotate
+⚠️ MEDIUM my-team/docs-site INTERNAL_ANALYTICS_FLAG production, plain, last update 2026-04-12, non-sensitive variable, advise to review manually
+ℹ️ LOW my-team/internal-tool DATABASE_URL preview, sensitive, last update 2026-04-19, changed since breach, looks lower risk, but still review
 ```
 
 ## Common usage
@@ -142,6 +156,12 @@ npm run check
 npm run smoke
 npm run audit -- --help
 ```
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow and testing expectations.
+
+If you find a security issue, use the private disclosure path in [`SECURITY.md`](SECURITY.md) instead of opening a public issue.
 
 ## Troubleshooting
 

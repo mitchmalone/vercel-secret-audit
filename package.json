@@ -2,8 +2,11 @@
   "name": "vercel-secret-audit",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first Vercel environment variable audit for likely secrets and post-breach rotation checks.",
+  "description": "Local audit CLI for Vercel environment variables, likely secrets, and post-breach rotation checks.",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "vercel-secret-audit": "./src/cli.mjs"
   },
@@ -18,7 +21,17 @@
     "security",
     "secrets",
     "audit",
-    "incident-response"
+    "incident-response",
+    "env",
+    "cli"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mitchmalone/vercel-secret-audit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mitchmalone/vercel-secret-audit/issues"
+  },
+  "homepage": "https://github.com/mitchmalone/vercel-secret-audit",
   "license": "MIT"
 }
