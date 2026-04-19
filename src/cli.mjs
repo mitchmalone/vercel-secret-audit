@@ -85,12 +85,13 @@ function createProgress(enabled) {
   let timer = null;
   let i = 0;
 
-  const render = (prefix = frames[i % frames.length]) => {
-    process.stdout.write(`\r${prefix} ${text}`);
+  const clear = () => {
+    process.stdout.write('\r\x1b[2K');
   };
 
-  const clear = () => {
-    process.stdout.write('\r\x1b[K');
+  const render = (prefix = frames[i % frames.length]) => {
+    clear();
+    process.stdout.write(`\r${prefix} ${text}`);
   };
 
   return {
