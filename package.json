@@ -1,0 +1,22 @@
+{
+  "name": "vercel-sedret-audit",
+  "version": "0.1.0",
+  "description": "Local-first Vercel environment variable audit for likely secrets and post-breach rotation checks.",
+  "type": "module",
+  "bin": {
+    "vercel-sedret-audit": "./src/cli.mjs"
+  },
+  "scripts": {
+    "check": "node --check src/*.mjs",
+    "start": "node ./src/cli.mjs",
+    "smoke": "bash ./scripts/smoke-test.sh"
+  },
+  "keywords": [
+    "vercel",
+    "security",
+    "secrets",
+    "audit",
+    "incident-response"
+  ],
+  "license": "MIT"
+}

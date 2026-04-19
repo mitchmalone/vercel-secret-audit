@@ -1,0 +1,72 @@
+# vercel-sedret-audit
+
+Local-first audit tool for Vercel environment variables.
+
+It helps answer two practical questions after the April 2026 incident:
+- which variables look like secrets and should probably be rotated now?
+- which likely secrets appear unchanged since the breach date?
+
+## Trust model
+
+- runs locally
+- never prints secret values
+- prefers your existing Vercel CLI session when possible
+- can also use a `VERCEL_TOKEN` for broader cross-project audits
+
+## Quick start
+
+```bash
+npx vercel-sedret-audit --linked-dir .
+```
+
+Or with a token:
+
+```bash
+VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope personal
+```
+
+## Common usage
+
+```bash
+# audit the current linked Vercel project
+npx vercel-sedret-audit --linked-dir .
+
+# audit multiple linked projects
+npx vercel-sedret-audit --linked-dir ./app-a --linked-dir ./app-b
+
+# audit a Vercel account or team with API token auth
+VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope personal
+VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team
+
+# only inspect specific projects
+VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team --project my-app
+
+# include breach-date awareness
+VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team --breach-date 2026-04-19
+
+# machine-readable output
+VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team --json
+```
+
+## Output levels
+
+- `CRITICAL`: likely secret, not stored as `sensitive`, or a public-prefixed accidental secret
+- `MEDIUM`: review manually
+- `LOW`: likely secret but already stored as `sensitive`
+- `OK`: expected public/client-side or otherwise low-risk metadata
+
+## Rotation verification
+
+If you provide `--breach-date YYYY-MM-DD`, the tool will classify likely secrets as:
+- `changed_since_breach`
+- `unchanged_since_breach`
+- `review_manually`
+
+That is useful evidence, not perfect proof.
+
+## Development
+
+```bash
+npm run check
+npm run start -- --help
+```
