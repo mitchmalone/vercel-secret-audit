@@ -1,4 +1,4 @@
-# vercel-sedret-audit
+# vercel-secret-audit
 
 Local-first audit tool for Vercel environment variables.
 
@@ -16,7 +16,7 @@ It helps answer two practical questions after the April 2026 incident:
 ## Quick start
 
 ```bash
-npx vercel-sedret-audit
+npx vercel-secret-audit
 ```
 
 By default, it will:
@@ -27,36 +27,36 @@ By default, it will:
 Or with a token:
 
 ```bash
-VERCEL_TOKEN=xxx npx vercel-sedret-audit
+VERCEL_TOKEN=xxx npx vercel-secret-audit
 ```
 
 ## Common usage
 
 ```bash
 # audit all accessible projects via current Vercel CLI login
-npx vercel-sedret-audit
+npx vercel-secret-audit
 
 # audit the current linked Vercel project only
-npx vercel-sedret-audit --linked-dir .
+npx vercel-secret-audit --linked-dir .
 
 # audit multiple linked projects
-npx vercel-sedret-audit --linked-dir ./app-a --linked-dir ./app-b
+npx vercel-secret-audit --linked-dir ./app-a --linked-dir ./app-b
 
 # audit all accessible projects with API token auth
-VERCEL_TOKEN=xxx npx vercel-sedret-audit
+VERCEL_TOKEN=xxx npx vercel-secret-audit
 
 # limit to one scope if needed
-VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope personal
-VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team
+VERCEL_TOKEN=xxx npx vercel-secret-audit --scope personal
+VERCEL_TOKEN=xxx npx vercel-secret-audit --scope my-team
 
 # only inspect specific projects
-VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team --project my-app
+VERCEL_TOKEN=xxx npx vercel-secret-audit --scope my-team --project my-app
 
 # include breach-date awareness
-VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team --breach-date 2026-04-19
+VERCEL_TOKEN=xxx npx vercel-secret-audit --scope my-team --breach-date 2026-04-19
 
 # machine-readable output
-VERCEL_TOKEN=xxx npx vercel-sedret-audit --scope my-team --json
+VERCEL_TOKEN=xxx npx vercel-secret-audit --scope my-team --json
 ```
 
 ## Output levels

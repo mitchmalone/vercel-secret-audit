@@ -49,7 +49,7 @@ function parseArgs(argv) {
 function usage() {
   return [
     'Usage:',
-    '  vercel-sedret-audit [options]',
+    '  vercel-secret-audit [options]',
     '',
     'Options:',
     '  --scope <personal|team-slug|team-id>   Repeatable, defaults to all accessible scopes',
