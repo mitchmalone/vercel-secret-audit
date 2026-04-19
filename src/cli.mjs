@@ -20,6 +20,7 @@ function parseArgs(argv) {
     breachDate: null,
     decrypt: false,
     includeOk: false,
+    verbose: false,
     json: false,
     help: false,
   };
@@ -36,6 +37,7 @@ function parseArgs(argv) {
     else if (arg.startsWith('--breach-date=')) out.breachDate = arg.split('=').slice(1).join('=');
     else if (arg === '--decrypt') out.decrypt = true;
     else if (arg === '--include-ok') out.includeOk = true;
+    else if (arg === '--verbose') out.verbose = true;
     else if (arg === '--json') out.json = true;
     else if (arg === '-h' || arg === '--help') out.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -56,6 +58,7 @@ function usage() {
     '  --breach-date <YYYY-MM-DD>             Compare updatedAt against a breach date',
     '  --decrypt                              Decrypt values for stronger heuristics, but never print them',
     '  --include-ok                           Also print low-risk / okay entries',
+    '  --verbose                              Show the old detailed line-by-line output',
     '  --json                                 Emit JSON instead of human-readable text',
     '  -h, --help                             Show this help',
     '',
@@ -240,7 +243,7 @@ async function main() {
     return;
   }
 
-  printHuman(results, args.includeOk);
+  printHuman(results, { includeOk: args.includeOk, verbose: args.verbose });
   if (failures.length > 0) {
     console.log('');
     console.log('Warnings:');
