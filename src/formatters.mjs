@@ -82,8 +82,8 @@ function verboseLine(f, enabled) {
 }
 
 function conciseLine(f, enabled) {
-  const scopeProject = style(enabled, ANSI.bold, `\`${f.scope}/${f.project}\``);
-  const key = style(enabled, ANSI.bold, `\`${f.key}\``);
+  const scopeProject = style(enabled, ANSI.bold, `${f.scope}/${f.project}`);
+  const key = colorize(enabled, ANSI.blue, style(enabled, ANSI.bold, f.key));
   const type = colorize(enabled, ANSI.dim, f.type);
   const updated = fmtDate(f.env.updatedAt || f.env.createdAt);
   const branch = f.env.gitBranch ? `, branch ${f.env.gitBranch}` : '';
